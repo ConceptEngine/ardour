@@ -1,0 +1,6 @@
+# This is a sample udev file to set "Ableton Push2 USB" device
+# permissions to 0666 (world readable/writable) on GNU/Linux systems.
+#
+# copy this file to /etc/udev/rules.d/
+
+KERNEL=="usb", ATTRS{idVendor}=="2982", ATTRS{idProduct}=="1967", MODE="0666"

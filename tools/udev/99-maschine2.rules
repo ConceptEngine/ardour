@@ -1,0 +1,6 @@
+# This is a sample udev file to set "Maschine Controller MK2 HID" device
+# permissions to 0666 (world readable/writable) on GNU/Linux systems.
+#
+# copy this file to /etc/udev/rules.d/
+
+KERNEL=="hidraw*", ATTRS{idVendor}=="17cc", ATTRS{idProduct}=="1140", MODE="0666"
