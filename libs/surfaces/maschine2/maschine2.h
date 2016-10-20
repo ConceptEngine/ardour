@@ -30,6 +30,8 @@
 #include "ardour/types.h"
 #include "control_protocol/control_protocol.h"
 
+#include "maschine2hardware.h"
+
 namespace ArdourSurface {
 
 class Maschine2Exception : public std::exception
@@ -83,6 +85,7 @@ class Maschine2: public ARDOUR::ControlProtocol, public AbstractUI<Maschine2Requ
 		bool dev_read ();
 
 		hid_device* handle;
+		Maschine2Hardware* hw;
 };
 
 } /* namespace */

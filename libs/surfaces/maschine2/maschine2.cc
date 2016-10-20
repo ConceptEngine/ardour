@@ -32,6 +32,7 @@
 #include "pbd/abstract_ui.cc" // instantiate template
 
 #include "maschine2.h"
+#include "hw_mk2.h"
 
 using namespace ARDOUR;
 using namespace PBD;
@@ -41,6 +42,7 @@ Maschine2::Maschine2 (ARDOUR::Session& s)
 	: ControlProtocol (s, string (X_("Native Instruments Maschine Controller MK2")))
 	, AbstractUI<Maschine2Request> (name())
 	, handle (0)
+	, hw (0)
 {
 	if (hid_init()) {
 		throw Maschine2Exception ("HIDAPI initialization failed");
@@ -52,6 +54,7 @@ Maschine2::~Maschine2 ()
 {
 	stop ();
 	hid_exit ();
+	delete hw;
 }
 
 void*
@@ -110,11 +113,17 @@ Maschine2::set_state (const XMLNode & node, int version)
 int
 Maschine2::start ()
 {
-	handle = hid_open (0x17cc, 0x1140, NULL);
+	// 17cc:???? Mikro
+	// 17cc:1140 Maschine
+	// 17cc:1300 Studio
+	handle = hid_open (0x17cc, 0x1140, NULL); // Maschine
+
 	if (!handle) {
 		error << _("Cannot find or connect to Maschine2");
 		return -1;
 	}
+
+	hw = new Maschine2Mk2 ();
 
 	Glib::RefPtr<Glib::TimeoutSource> write_timeout = Glib::TimeoutSource::create (40);
 	write_connection = write_timeout->connect (sigc::mem_fun (*this, &Maschine2::dev_write));
@@ -130,11 +139,16 @@ Maschine2::start ()
 int
 Maschine2::stop ()
 {
-	hid_close (handle);
-	handle = 0;
-
 	read_connection.disconnect ();
 	write_connection.disconnect ();
+
+	if (handle && hw) {
+		hw->clear ();
+		hw->write (handle);
+	}
+
+	hid_close (handle);
+	handle = 0;
 
 	stop_event_loop ();
 	return 0;
@@ -170,17 +184,13 @@ Maschine2::stop_event_loop ()
 bool
 Maschine2::dev_read ()
 {
-	uint8_t buf[256];
-	int res = hid_read(handle, buf, 256);
-	if (res < 1) {
-		return true;
-	}
-	printf ("%d\n", res);
+	hw->read (handle);
 	return true;
 }
 
 bool
 Maschine2::dev_write ()
 {
+	hw->write (handle);
 	return true;
 }

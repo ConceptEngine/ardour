@@ -20,6 +20,7 @@ def build(bld):
     obj.source = '''
             maschine2.cc
 	    interface.cc
+	    hw_mk2.cc
     '''
     obj.export_includes = ['.']
     obj.defines      = [ 'PACKAGE="ardour_maschine2"' ]
