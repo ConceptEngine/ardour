@@ -1,5 +1,8 @@
 #include "maschine2hardware.h"
 
+#include <cairomm/context.h>
+#include <pangomm/layout.h>
+
 namespace ArdourSurface {
 
 class Maschine2Mk2 : public Maschine2Hardware
@@ -66,5 +69,8 @@ class Maschine2Mk2 : public Maschine2Hardware
 		} ctrl_in;
 
 		uint16_t pad[16];
+
+		Cairo::RefPtr<Cairo::ImageSurface> _surface[2];
+		Glib::RefPtr<Pango::Layout> _layout[2];
 };
 } /* namespace */

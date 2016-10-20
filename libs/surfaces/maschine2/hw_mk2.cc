@@ -1,13 +1,46 @@
-#include "canvas/colors.h"
+#include <math.h>
 
 #include "maschine2.h"
 #include "hw_mk2.h"
+
+#include <pangomm/fontdescription.h>
+#include <pango/pangocairo.h>
+
+#include "canvas/colors.h"
 
 using namespace ArdourSurface;
 
 Maschine2Mk2::Maschine2Mk2 ()
 {
+	_surface[0] = Cairo::ImageSurface::create (Cairo::FORMAT_ARGB32, 256, 64);
+	_surface[1] = Cairo::ImageSurface::create (Cairo::FORMAT_ARGB32, 256, 64);
+
 	clear ();
+
+	Pango::FontDescription fd ("Sans 10px");
+
+	Cairo::RefPtr<Cairo::Context> cr0 = Cairo::Context::create (_surface[0]);
+	PangoLayout* pl = pango_cairo_create_layout (cr0->cobj ());
+	_layout[0] = Glib::wrap (pl);
+	_layout[0]->set_font_description (fd);
+
+	Cairo::RefPtr<Cairo::Context> cr1 = Cairo::Context::create (_surface[1]);
+	pl = pango_cairo_create_layout (cr1->cobj ());
+	_layout[1] = Glib::wrap (pl);
+	_layout[1]->set_font_description (fd);
+
+
+	// paint something...
+	_layout[0]->set_text ("ARDOUR");
+	cr0->move_to (10, 10);
+	cr0->set_source_rgba (1, 1, 1, 1);
+	pango_cairo_show_layout (cr0->cobj(), _layout[0]->gobj());
+	cr0->rectangle (60, 10, 40, 40);
+	cr0->fill ();
+
+	cr1->set_source_rgba (1, 1, 1, 1);
+	cr1->arc (128, 32, 27, 0, 2. * M_PI);
+	cr1->fill ();
 }
 
 void
@@ -15,6 +48,15 @@ Maschine2Mk2::clear ()
 {
 	memset (&ctrl_in, 0, sizeof (ctrl_in));
 	memset (pad, 0, sizeof (pad));
+
+	Cairo::RefPtr<Cairo::Context> c = Cairo::Context::create (_surface[0]);
+	c->set_operator (Cairo::OPERATOR_CLEAR);
+	c->paint ();
+	c->set_operator (Cairo::OPERATOR_OVER);
+	c = Cairo::Context::create (_surface[1]);
+	c->set_operator (Cairo::OPERATOR_CLEAR);
+	c->paint ();
+	c->set_operator (Cairo::OPERATOR_OVER);
 }
 
 void
@@ -32,6 +74,7 @@ Maschine2Mk2::read (hid_device* handle)
 		assert (sizeof(ctrl_in) == 24);
 		memcpy(&ctrl_in, &buf[1], sizeof(ctrl_in));
 		// TODO copy settings to generic/abstract interface
+		// TODO compare to current data, emit changed signals
 	}
 	else if (res > 32 && buf[0] == 0x20) {
 		for (int i = 0; i < 16; ++i) {
@@ -42,6 +85,9 @@ Maschine2Mk2::read (hid_device* handle)
 		}
 		// TODO read complete 65 byte msg
 		// expect buf[33] == 0x00
+
+		// TODO copy settings to generic/abstract interface
+		// TODO .. compare & emit changes
 	}
 }
 
@@ -151,12 +197,27 @@ Maschine2Mk2::write (hid_device* handle)
 	for (int d = 0; d < 2; ++d) {
 		memset (buf, 0, 265);
 		buf[0] = 0xe0 | d;
+		_surface[d]->flush ();
+		const unsigned char* img = _surface[d]->get_data ();
+		int stride = _surface[d]->get_stride ();
 		for (int l = 0; l < 8; ++l) {
 			buf[3] = 8 * l;
 			buf[5] = 0x20;
 			buf[7] = 0x08;
+
+			int y0 = l * 8;
 			for (int p = 0; p < 256; ++p) {
-				buf[9 + p] = 0x00; // bitmap
+				uint8_t v = 0;
+				int y = y0 + p / 32;
+				for (int b = 0; b < 8; ++b) {
+					int x = (p % 32) * 8 + b;
+					int off = y * stride + x * 4 /* RGBA32 */;
+					//printf ("%d %d -> %d\n", x, y, off);
+					if (img[off + 1] > 0x7f) {
+						v |= 1 << (7 - b);
+					}
+				}
+				buf[9 + p] = v;
 			}
 			hid_write (handle, buf, 265);
 		}
